@@ -1221,3 +1221,21 @@ if Path(inspect.stack()[0].filename).parent.parent.as_posix() in inspect.stack()
     cv2.imread, cv2.imwrite, cv2.imshow = imread, imwrite, imshow  # redefine
 
 # Variables ------------------------------------------------------------------------------------------------------------
+
+
+def get_object_level_feature_maps(feature_map, targets):
+    feature_map_shape = feature_map.shape[2:]
+
+    x_center = targets[:,2] * feature_map_shape[1]
+    y_center = targets[:,3] * feature_map_shape[0]
+
+    width = targets[:, 4] * feature_map_shape[1]
+    height = targets[:, 5] * feature_map_shape[0]
+
+    x_min = torch.clamp((x_center-width/2).int(), 0, feature_map_shape[1]-1)
+    y_min = torch.clamp((y_center-height/2).int(), 0, feature_map_shape[0]-1)
+    x_max = torch.clamp((x_center+width/2).int(), 0, feature_map_shape[1]-1)
+    y_max = torch.clamp((y_center+height/2).int(), 0, feature_map_shape[0]-1)
+
+    extracted_regions = [feature_map[:, :, y_min[i]:y_max[i]+1, x_min[i]:x_max[i]+1] for i in range(targets.shape[0])]
+    return extracted_regions

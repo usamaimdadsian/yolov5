@@ -77,6 +77,7 @@ from utils.general import (
     print_mutation,
     strip_optimizer,
     yaml_save,
+    get_object_level_feature_maps
 )
 from utils.loggers import LOGGERS, Loggers
 from utils.loggers.comet.comet_utils import check_comet_resume
@@ -373,7 +374,17 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
 
             # Forward
             with torch.cuda.amp.autocast(amp):
-                pred = model(imgs)  # forward
+                pred,int_feats = model(imgs)  # forward
+                extracted_regions_p1 = get_object_level_feature_maps(int_feats[0],targets)
+                extracted_regions_p2 = get_object_level_feature_maps(int_feats[1],targets)
+                # extracted_regions_3 = get_object_level_feature_maps(int_feats[2],targets)
+                # extracted_regions_p3 = get_object_level_feature_maps(int_feats[3],targets)
+                # extracted_regions_5 = get_object_level_feature_maps(int_feats[4],targets)
+                # extracted_regions_p1 = get_object_level_feature_maps(int_feats[0],targets)
+                # extracted_regions_p5 = get_object_level_feature_maps(int_feats[1],targets)
+
+                batch_indices = targets[:,0].long()
+
                 loss, loss_items = compute_loss(pred, targets.to(device))  # loss scaled by batch_size
                 if RANK != -1:
                     loss *= WORLD_SIZE  # gradient averaged between devices in DDP mode

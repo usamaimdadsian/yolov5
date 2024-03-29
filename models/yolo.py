@@ -147,16 +147,26 @@ class BaseModel(nn.Module):
 
     def _forward_once(self, x, profile=False, visualize=False):
         y, dt = [], []  # outputs
+        inter_feats = []
+        target_layer_index = 2
+        curr_layer = 0
+        
         for m in self.model:
             if m.f != -1:  # if not from previous layer
                 x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
             if profile:
                 self._profile_one_layer(m, x, dt)
             x = m(x)  # run
+            if ((isinstance(m,Conv) and curr_layer == 0) or (isinstance(m,Conv) and curr_layer == 1) or (isinstance(m,C3) and curr_layer==2) or (isinstance(m,Conv) and curr_layer==3) or (isinstance(m,C3) and curr_layer==4) or (isinstance(m,Conv) and curr_layer==5) or (isinstance(m,C3) and curr_layer==6) or (isinstance(m,Conv) and curr_layer==7) or (isinstance(m,C3) and curr_layer==8)):
+                inter_feats.append(x.clone())
+                # contains_non_zero = (x!= 0).any().item()
+                # if contains_non_zero:
+                #     feature_visualization(x,m.type, m.i, save_dir=Path("runs/features"))
             y.append(x if m.i in self.save else None)  # save output
+            curr_layer += 1
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
-        return x
+        return x,inter_feats
 
     def _profile_one_layer(self, m, x, dt):
         c = m == self.model[-1]  # is final layer, copy input as inplace fix
@@ -226,7 +236,7 @@ class DetectionModel(BaseModel):
         if isinstance(m, (Detect, Segment)):
             s = 256  # 2x min stride
             m.inplace = self.inplace
-            forward = lambda x: self.forward(x)[0] if isinstance(m, Segment) else self.forward(x)
+            forward = lambda x: self.forward(x)[0] if isinstance(m, Segment) else self.forward(x)[0]
             m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward
             check_anchor_order(m)
             m.anchors /= m.stride.view(-1, 1, 1)
@@ -241,7 +251,9 @@ class DetectionModel(BaseModel):
     def forward(self, x, augment=False, profile=False, visualize=False):
         if augment:
             return self._forward_augment(x)  # augmented inference, None
-        return self._forward_once(x, profile, visualize)  # single-scale inference, train
+
+        x, inter_features = self._forward_once(x,profile,visualize)
+        return x,inter_features 
 
     def _forward_augment(self, x):
         img_size = x.shape[-2:]  # height, width
